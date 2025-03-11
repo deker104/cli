@@ -27,7 +27,7 @@ go build -o cli-interpreter ./cmd
 
 ## Запуск тестов
 ```sh
-go test ./internal/...
+go test ./...
 ```
 
 ## CI/CD
