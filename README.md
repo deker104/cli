@@ -1,5 +1,7 @@
 # CLI Interpreter
 
+![Build and test workflow status](https://github.com/deker104/convex-hull/actions/workflows/ci.yml/badge.svg?branch=master)
+
 ## Описание
 Этот проект представляет собой CLI-интерпретатор, поддерживающий команды:
 - `cat [FILE]` — вывести содержимое файла
