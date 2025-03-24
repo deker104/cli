@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-// Parse разбирает команду, учитывая кавычки.
+// Parse разбирает строку, учитывая кавычки и экранированные символы.
 func Parse(input string) []string {
 	var tokens []string
 	var current strings.Builder
@@ -35,10 +35,19 @@ func Parse(input string) []string {
 			continue
 		}
 
+		// Экранирование кавычек
+		if char == '\\' && i+1 < len(input) && (input[i+1] == '"' || input[i+1] == '\'') {
+			i++
+			char = input[i]
+		}
+
 		current.WriteByte(char)
 	}
 
-	if current.Len() > 0 {
+	// Если кавычки остались незакрытыми, включаем их в последний токен
+	if inQuotes {
+		tokens = append(tokens, string(quoteChar)+current.String())
+	} else if current.Len() > 0 {
 		tokens = append(tokens, current.String())
 	}
 
