@@ -11,18 +11,22 @@ import (
 
 const ExitCode = 127
 
-// Executor выполняет команды.
 type Executor struct {
 	env *env.EnvManager
 }
 
-// NewExecutor создает новый Executor.
 func NewExecutor(env *env.EnvManager) *Executor {
 	return &Executor{env: env}
 }
 
-// Execute выполняет команду.
-func (e *Executor) Execute(tokens []string) int {
+func (e *Executor) Execute(pipeline [][]string) int {
+	if len(pipeline) == 1 {
+		return e.runSingleCommand(pipeline[0])
+	}
+	return e.runPipeline(pipeline)
+}
+
+func (e *Executor) runSingleCommand(tokens []string) int {
 	cmd := tokens[0]
 
 	switch cmd {
@@ -43,6 +47,42 @@ func (e *Executor) Execute(tokens []string) int {
 	return 0
 }
 
+func (e *Executor) runPipeline(pipeline [][]string) int {
+	var lastExitCode int
+	var prevPipe *os.File
+
+	for i, command := range pipeline {
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Env = os.Environ()
+
+		// Если не последняя команда, создаем пайп
+		if i != len(pipeline)-1 {
+			pipeOut, pipeIn, _ := os.Pipe()
+			cmd.Stdout = pipeIn
+			prevPipe = pipeOut
+		} else {
+			cmd.Stdout = os.Stdout
+		}
+
+		// Подключаем stdin
+		if prevPipe != nil {
+			cmd.Stdin = prevPipe
+			prevPipe.Close()
+		}
+
+		// Запускаем команду
+		if err := cmd.Run(); err != nil {
+			fmt.Println(err)
+			lastExitCode = 1
+		} else {
+			lastExitCode = cmd.ProcessState.ExitCode()
+		}
+	}
+
+	return lastExitCode
+}
+
+// runCat — встроенная команда `cat`
 func (e *Executor) runCat(args []string) int {
 	if len(args) == 0 {
 		fmt.Println("cat: missing file operand")
@@ -57,6 +97,7 @@ func (e *Executor) runCat(args []string) int {
 	return 0
 }
 
+// runWc — встроенная команда `wc`
 func (e *Executor) runWc(args []string) int {
 	if len(args) == 0 {
 		fmt.Println("wc: missing file operand")
@@ -74,6 +115,7 @@ func (e *Executor) runWc(args []string) int {
 	return 0
 }
 
+// runExternalCommand — выполняет внешнюю программу
 func (e *Executor) runExternalCommand(tokens []string) int {
 	cmd := exec.Command(tokens[0], tokens[1:]...)
 	cmd.Env = os.Environ()

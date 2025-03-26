@@ -10,18 +10,15 @@ import (
 )
 
 func captureOutput(f func()) string {
-	// Создаём pipe
 	r, w, _ := os.Pipe()
 	oldStdout := os.Stdout
 	os.Stdout = w
 
 	f()
 
-	// Восстанавливаем stdout
 	w.Close()
 	os.Stdout = oldStdout
 
-	// Читаем данные из pipe
 	var buf bytes.Buffer
 	io.Copy(&buf, r)
 	r.Close()
@@ -33,7 +30,7 @@ func TestEcho(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
 	output := captureOutput(func() {
-		exec.Execute([]string{"echo", "hello"})
+		exec.Execute([][]string{{"echo", "hello"}})
 	})
 
 	expected := "hello\n"
@@ -46,7 +43,7 @@ func TestPwd(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
 	output := captureOutput(func() {
-		exec.Execute([]string{"pwd"})
+		exec.Execute([][]string{{"pwd"}})
 	})
 
 	if output == "" {
@@ -57,7 +54,7 @@ func TestPwd(t *testing.T) {
 func TestExit(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
-	code := exec.Execute([]string{"exit"})
+	code := exec.Execute([][]string{{"exit"}})
 	if code != ExitCode {
 		t.Errorf("Expected exit code %d, got %d", ExitCode, code)
 	}
@@ -67,7 +64,7 @@ func TestUnknownCommand(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
 	output := captureOutput(func() {
-		exec.Execute([]string{"unknown_command"})
+		exec.Execute([][]string{{"unknown_command"}})
 	})
 
 	if output == "" {
