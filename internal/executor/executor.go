@@ -1,16 +1,16 @@
 package executor
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
-	"bufio"
-	"bytes"
 	"regexp"
+	"strings"
 
-	"github.com/spf13/pflag"
 	"github.com/deker104/cli/internal/env"
+	"github.com/spf13/pflag"
 )
 
 const ExitCode = 127
@@ -208,7 +208,7 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 	// Читаем строки и фильтруем вывод
 	for scanner.Scan() {
 		line := scanner.Text()
-	
+
 		if re.MatchString(line) {
 			linesAfter = max(linesAfter, opts.AfterLines) // пересечение областей
 			buffer.WriteString(line + "\n")
@@ -216,10 +216,9 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 			buffer.WriteString(line + "\n")
 			linesAfter--
 		}
-	
+
 		currentLine++
 	}
-	
 
 	if err := scanner.Err(); err != nil {
 		fmt.Printf("grep: error reading file: %v\n", err)
