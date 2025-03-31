@@ -4,8 +4,9 @@ import (
 	"strings"
 )
 
-// Parse разбирает строку, учитывая кавычки и экранированные символы.
-func Parse(input string) []string {
+// Parse разбирает строку, учитывая кавычки, пайпы и пробелы между аргументами.
+func Parse(input string) [][]string {
+	var result [][]string
 	var tokens []string
 	var current strings.Builder
 	inQuotes := false
@@ -13,6 +14,18 @@ func Parse(input string) []string {
 
 	for i := 0; i < len(input); i++ {
 		char := input[i]
+
+		if char == '|' && !inQuotes {
+			if current.Len() > 0 {
+				tokens = append(tokens, current.String())
+				current.Reset()
+			}
+			if len(tokens) > 0 {
+				result = append(result, tokens)
+				tokens = nil
+			}
+			continue
+		}
 
 		if char == '"' || char == '\'' {
 			if inQuotes {
@@ -27,6 +40,12 @@ func Parse(input string) []string {
 			}
 		}
 
+		// Поддержка экранированных кавычек
+		if char == '\\' && i+1 < len(input) && (input[i+1] == '"' || input[i+1] == '\'') {
+			i++
+			char = input[i]
+		}
+
 		if char == ' ' && !inQuotes {
 			if current.Len() > 0 {
 				tokens = append(tokens, current.String())
@@ -35,21 +54,17 @@ func Parse(input string) []string {
 			continue
 		}
 
-		// Экранирование кавычек
-		if char == '\\' && i+1 < len(input) && (input[i+1] == '"' || input[i+1] == '\'') {
-			i++
-			char = input[i]
-		}
-
 		current.WriteByte(char)
 	}
 
-	// Если кавычки остались незакрытыми, включаем их в последний токен
-	if inQuotes {
-		tokens = append(tokens, string(quoteChar)+current.String())
-	} else if current.Len() > 0 {
+	if current.Len() > 0 {
 		tokens = append(tokens, current.String())
 	}
 
-	return tokens
+	// НЕ разбиваем аргументы, если они были в кавычках
+	if len(tokens) > 0 {
+		result = append(result, tokens)
+	}
+
+	return result
 }
