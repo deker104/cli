@@ -71,3 +71,53 @@ func TestUnknownCommand(t *testing.T) {
 		t.Errorf("Expected error output for unknown command")
 	}
 }
+
+func TestGrep(t *testing.T) {
+	exec := NewExecutor(env.NewEnvManager())
+
+	testFile := "testfile.txt"
+	content := "hello world\nthis is a test\ngrep is cool\ntest again\nanother test line\ntasty line\n"
+	os.WriteFile(testFile, []byte(content), 0644)
+	defer os.Remove(testFile)
+
+	output := captureOutput(func() {
+		exec.Execute([][]string{{"grep", "test", testFile}})
+	})
+	expected := "this is a test\ntest again\nanother test line\n"
+	if output != expected {
+		t.Errorf("Expected %q, got %q", expected, output)
+	}
+
+	output = captureOutput(func() {
+		exec.Execute([][]string{{"grep", "-w", "test", testFile}})
+	})
+	expected = "this is a test\ntest again\nanother test line\n"
+	if output != expected {
+		t.Errorf("Expected %q, got %q", expected, output)
+	}
+
+	output = captureOutput(func() {
+		exec.Execute([][]string{{"grep", "-i", "TEST", testFile}})
+	})
+	expected = "this is a test\ntest again\nanother test line\n"
+	if output != expected {
+		t.Errorf("Expected %q, got %q", expected, output)
+	}
+
+	output = captureOutput(func() {
+		exec.Execute([][]string{{"grep", "-A", "1", "grep", testFile}})
+	})
+	expected = "grep is cool\ntest again\n"
+	if output != expected {
+		t.Errorf("Expected %q, got %q", expected, output)
+	}
+
+	output = captureOutput(func() {
+		exec.Execute([][]string{{"grep", "hello", "nofile.txt"}})
+	})
+	if output == "" {
+		t.Errorf("Expected error message for missing file")
+	}
+}
+
+
