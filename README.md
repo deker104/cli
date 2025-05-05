@@ -1,7 +1,3 @@
-Внимание! Если вы выполняете задание CLI-4 специально для вашего задания создана ветка "cd+ls" со stable версией, в которую надо делать PR. Другие ветки, пожалуйста, не трогайте. Версия в main - не последняя версия, смотрите только на вашу ветку cd+ls.
-
- Сделайте форк, внесите изменения в данную ветку, и сделайте PR в исходный репозиторий.
-
 # CLI Interpreter
 
 ![Build and test workflow status](https://github.com/deker104/convex-hull/actions/workflows/ci.yml/badge.svg?branch=master)
