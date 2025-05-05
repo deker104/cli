@@ -69,7 +69,7 @@ func TestWcCommand(t *testing.T) {
 func TestPwdCommand(t *testing.T) {
 	out, _ := runCLI("pwd")
 	clean := stripPrompt(out)
-	if !strings.Contains(clean, "/") {
+	if !strings.Contains(clean, "/") && !strings.Contains(clean, "\\") {
 		t.Errorf("TestPwdCommand failed.\nExpected output to be a path.\nGot: %q", clean)
 	}
 }
