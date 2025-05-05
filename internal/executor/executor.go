@@ -106,7 +106,6 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 	return lastExitCode
 }
 
-
 // runCat — встроенная команда `cat`
 func (e *Executor) runCat(args []string) int {
 	if len(args) == 0 {

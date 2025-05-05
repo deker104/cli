@@ -52,7 +52,7 @@ func TestCatCommand(t *testing.T) {
 func TestEchoCommand(t *testing.T) {
 	out, _ := runCLI("echo hello")
 	clean := stripPrompt(out)
-	expected := "hello\n\n" 
+	expected := "hello\n\n"
 	if clean != expected {
 		t.Errorf("TestEchoCommand failed.\nExpected: %q\nGot: %q", expected, clean)
 	}
@@ -78,7 +78,7 @@ func TestUnknownCommandExternal(t *testing.T) {
 	os.Setenv("HOME", "/tmp/fakehome")
 	out, _ := runCLI("echo $HOME")
 	clean := stripPrompt(out)
-	expected := "/tmp/fakehome\n\n" 
+	expected := "/tmp/fakehome\n\n"
 	if clean != expected {
 		t.Errorf("TestUnknownCommandExternal failed.\nExpected: %q\nGot: %q", expected, clean)
 	}
@@ -122,7 +122,7 @@ func TestGrepAfterLines(t *testing.T) {
 	clean := stripPrompt(out)
 	if !strings.Contains(clean, "line2") {
 		t.Errorf("TestGrepAfterLines failed.\nExpected line2 after match not found.\nOutput:\n%s", clean)
-	}	
+	}
 }
 
 func TestPipelineCommands(t *testing.T) {
