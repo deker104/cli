@@ -54,30 +54,48 @@ func (e *Executor) runSingleCommand(tokens []string) int {
 }
 
 func (e *Executor) runPipeline(pipeline [][]string) int {
-	var lastExitCode int
-	var prevPipe *os.File
+	var commands []*exec.Cmd
+	var pipes []*os.File
 
-	for i, command := range pipeline {
-		cmd := exec.Command(command[0], command[1:]...)
+	// Создание команд
+	for _, cmdArgs := range pipeline {
+		commands = append(commands, exec.Command(cmdArgs[0], cmdArgs[1:]...))
+	}
+
+	// Установка пайпов между командами
+	for i := 0; i < len(commands)-1; i++ {
+		readEnd, writeEnd, err := os.Pipe()
+		if err != nil {
+			fmt.Printf("pipe error: %v\n", err)
+			return 1
+		}
+		commands[i].Stdout = writeEnd
+		commands[i+1].Stdin = readEnd
+		pipes = append(pipes, readEnd, writeEnd)
+	}
+
+	// Последняя команда выводит в stdout
+	commands[len(commands)-1].Stdout = os.Stdout
+
+	// Запуск всех команд
+	for _, cmd := range commands {
 		cmd.Env = os.Environ()
-
-		// Если не последняя команда, создаем пайп
-		if i != len(pipeline)-1 {
-			pipeOut, pipeIn, _ := os.Pipe()
-			cmd.Stdout = pipeIn
-			prevPipe = pipeOut
-		} else {
-			cmd.Stdout = os.Stdout
+		if err := cmd.Start(); err != nil {
+			fmt.Printf("command start error: %v\n", err)
+			return 1
 		}
+	}
 
-		// Подключаем stdin
-		if prevPipe != nil {
-			cmd.Stdin = prevPipe
-			prevPipe.Close()
-		}
+	// Закрытие всех пайпов в родителе
+	for _, pipe := range pipes {
+		pipe.Close()
+	}
 
-		// Запускаем команду
-		if err := cmd.Run(); err != nil {
+	// Ожидание завершения всех команд
+	var lastExitCode int
+	for _, cmd := range commands {
+		err := cmd.Wait()
+		if err != nil {
 			fmt.Println(err)
 			lastExitCode = 1
 		} else {
