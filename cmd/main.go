@@ -8,6 +8,7 @@ import (
 	"github.com/deker104/cli/internal/env"
 	"github.com/deker104/cli/internal/executor"
 	"github.com/deker104/cli/internal/parser"
+	"github.com/deker104/cli/internal/substitutor"
 )
 
 func main() {
@@ -31,8 +32,14 @@ func main() {
 			continue
 		}
 
+		// Подстановка
+		for i := range tokens {
+			tokens[i] = substitutor.Substitute(tokens[i], 0)
+		}
+
 		// Выполнение команды
 		exitCode := exec.Execute(tokens)
+
 		if exitCode == executor.ExitCode {
 			break
 		}
