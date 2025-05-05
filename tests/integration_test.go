@@ -52,7 +52,7 @@ func TestCatCommand(t *testing.T) {
 func TestEchoCommand(t *testing.T) {
 	out, _ := runCLI("echo hello")
 	clean := stripPrompt(out)
-	expected := "hello\n\n"
+	expected := "hello\n\n" 
 	if clean != expected {
 		t.Errorf("TestEchoCommand failed.\nExpected: %q\nGot: %q", expected, clean)
 	}
@@ -78,7 +78,7 @@ func TestUnknownCommandExternal(t *testing.T) {
 	os.Setenv("HOME", "/tmp/fakehome")
 	out, _ := runCLI("echo $HOME")
 	clean := stripPrompt(out)
-	expected := "/tmp/fakehome\n\n"
+	expected := "/tmp/fakehome\n\n" 
 	if clean != expected {
 		t.Errorf("TestUnknownCommandExternal failed.\nExpected: %q\nGot: %q", expected, clean)
 	}
