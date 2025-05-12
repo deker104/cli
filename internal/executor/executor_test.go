@@ -90,7 +90,6 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
-
 func TestPipeEchoToWc(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
