@@ -13,16 +13,20 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const ExitCode = 127
+// ExitCode — специальный код выхода, используемый командой `exit`.
+const ExitCode = 127 // выбрано как стандартный "ошибочный" код завершения
 
+// Executor — структура, выполняющая команды CLI.
 type Executor struct {
 	env *env.EnvManager
 }
 
+// NewExecutor создает Executor с поддержкой переменных окружения.
 func NewExecutor(env *env.EnvManager) *Executor {
 	return &Executor{env: env}
 }
 
+// Execute выполняет список команд в пайпе. Возвращает код завершения.
 func (e *Executor) Execute(pipeline [][]string) int {
 	if len(pipeline) == 1 {
 		return e.runSingleCommand(pipeline[0])
@@ -30,6 +34,7 @@ func (e *Executor) Execute(pipeline [][]string) int {
 	return e.runPipeline(pipeline)
 }
 
+// runSingleCommand выполняет одну команду (встроенную или внешнюю).
 func (e *Executor) runSingleCommand(tokens []string) int {
 	cmd := tokens[0]
 
@@ -53,18 +58,19 @@ func (e *Executor) runSingleCommand(tokens []string) int {
 	return 0
 }
 
+// runPipeline — выполняет пайп (несколько команд, соединённых через `|`).
 func (e *Executor) runPipeline(pipeline [][]string) int {
 	var commands []*exec.Cmd
 	var pipes []*os.File
 
-	// Создание команд
+	// Создание exec.Cmd объектов для всех команд
 	for _, cmdArgs := range pipeline {
 		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 		cmd.Env = os.Environ()
 		commands = append(commands, cmd)
 	}
 
-	// Создание пайпов между командами
+	// Связывание stdout одной команды с stdin следующей
 	for i := 0; i < len(commands)-1; i++ {
 		readEnd, writeEnd, err := os.Pipe()
 		if err != nil {
@@ -76,11 +82,11 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 		pipes = append(pipes, readEnd, writeEnd)
 	}
 
-	// Последняя команда выводит в stdout
+	// Последняя команда пишет в стандартный вывод
 	commands[len(commands)-1].Stdout = os.Stdout
 	commands[len(commands)-1].Stderr = os.Stderr
 
-	// Запуск всех команд
+	// Запуск команд
 	for _, cmd := range commands {
 		if err := cmd.Start(); err != nil {
 			fmt.Fprintf(os.Stderr, "command start error: %v\n", err)
@@ -88,12 +94,12 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 		}
 	}
 
-	// Закрытие пайпов в родителе
+	// Закрытие всех пайпов
 	for _, pipe := range pipes {
 		pipe.Close()
 	}
 
-	// Ожидание завершения
+	// Ожидание завершения всех команд
 	finalCode := 0
 	for i, cmd := range commands {
 		err := cmd.Wait()
@@ -106,16 +112,15 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 				fmt.Fprintf(os.Stderr, "command %d failed: %v\n", i, err)
 				finalCode = 1
 			}
-		} else {
-			if finalCode == 0 {
-				finalCode = cmd.ProcessState.ExitCode()
-			}
+		} else if finalCode == 0 {
+			finalCode = cmd.ProcessState.ExitCode()
 		}
 	}
 
 	return finalCode
 }
 
+// runCat реализует встроенную команду `cat`.
 func (e *Executor) runCat(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "cat: missing file operand")
@@ -130,6 +135,7 @@ func (e *Executor) runCat(args []string) int {
 	return 0
 }
 
+// runWc реализует команду `wc` — подсчёт строк, слов и байт.
 func (e *Executor) runWc(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "wc: missing file operand")
@@ -147,6 +153,7 @@ func (e *Executor) runWc(args []string) int {
 	return 0
 }
 
+// runExternalCommand выполняет внешнюю системную команду.
 func (e *Executor) runExternalCommand(tokens []string) int {
 	cmd := exec.Command(tokens[0], tokens[1:]...)
 	cmd.Env = os.Environ()
@@ -164,6 +171,7 @@ func (e *Executor) runExternalCommand(tokens []string) int {
 	return 0
 }
 
+// GrepOptions — параметры команды grep.
 type GrepOptions struct {
 	Pattern    string
 	Filename   string
@@ -172,9 +180,9 @@ type GrepOptions struct {
 	AfterLines int
 }
 
+// runGrep парсит аргументы и вызывает executeGrep.
 func (e *Executor) runGrep(args []string) int {
 	flags := pflag.NewFlagSet("grep", pflag.ContinueOnError)
-
 	wordMatch := flags.BoolP("word", "w", false, "Искать только целые слова")
 	ignoreCase := flags.BoolP("ignore-case", "i", false, "Игнорировать регистр")
 	afterLines := flags.IntP("after", "A", 0, "Количество строк после совпадения")
@@ -198,10 +206,10 @@ func (e *Executor) runGrep(args []string) int {
 		IgnoreCase: *ignoreCase,
 		AfterLines: *afterLines,
 	}
-
 	return e.executeGrep(options)
 }
 
+// executeGrep выполняет саму логику поиска по регулярному выражению.
 func (e *Executor) executeGrep(opts GrepOptions) int {
 	file, err := os.Open(opts.Filename)
 	if err != nil {
@@ -227,11 +235,9 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 	scanner := bufio.NewScanner(file)
 	var buffer bytes.Buffer
 	linesAfter := 0
-	currentLine := 0
 
 	for scanner.Scan() {
 		line := scanner.Text()
-
 		if re.MatchString(line) {
 			linesAfter = max(linesAfter, opts.AfterLines)
 			buffer.WriteString(line + "\n")
@@ -239,8 +245,6 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 			buffer.WriteString(line + "\n")
 			linesAfter--
 		}
-
-		currentLine++
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -252,6 +256,7 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 	return 0
 }
 
+// max возвращает максимум из двух целых чисел.
 func max(a, b int) int {
 	if a > b {
 		return a

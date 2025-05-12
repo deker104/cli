@@ -2,13 +2,19 @@ package parser
 
 import "strings"
 
-// Token — аргумент команды, с указанием, разрешена ли подстановка переменных
+// Token представляет собой аргумент команды.
+// SubstituteEnv указывает, разрешена ли подстановка переменных (true — двойные кавычки или без кавычек).
 type Token struct {
 	Value         string
 	SubstituteEnv bool
 }
 
-// Parse разбирает строку в пайпы и токены с учетом кавычек и подстановок
+// Parse разбивает строку ввода на пайпы и токены.
+// Поддерживает:
+// - Кавычки (' и "), различающиеся по подстановке
+// - Экранирование кавычек
+// - Пробелы между аргументами
+// - Разделение пайпов (|) на отдельные команды
 func Parse(input string) [][]Token {
 	var result [][]Token
 	var tokens []Token
@@ -41,7 +47,7 @@ func Parse(input string) [][]Token {
 			} else {
 				inQuotes = true
 				quoteChar = char
-				substitute = (char == '"') // только слабые кавычки позволяют подстановку
+				substitute = (char == '"')
 				continue
 			}
 		}

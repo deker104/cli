@@ -8,8 +8,10 @@ import (
 	"github.com/deker104/cli/internal/parser"
 )
 
-// Substitute заменяет переменные окружения в аргументах.
-// Только если SubstituteEnv == true
+// Substitute заменяет переменные окружения в аргументах токенов.
+// - $FOO -> значение переменной окружения
+// - $? -> код возврата последней команды
+// - Подстановка отключена, если SubstituteEnv == false
 func Substitute(args []parser.Token, lastExitCode int) []string {
 	var result []string
 	for _, arg := range args {
