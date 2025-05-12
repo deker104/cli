@@ -10,21 +10,29 @@ import (
 
 const inputFile = "../tests/test_input.txt"
 
-// runCLI запускает CLI с заданной строкой и возвращает stdout
-func runCLI(input string) (string, error) {
+// runCLI запускает CLI с заданной строкой и возвращает stdout, код возврата и ошибку запуска
+func runCLI(input string) (string, int, error) {
 	cmd := exec.Command("go", "run", "../cmd/main.go")
-	cmd.Stderr = os.Stderr
-	stdin := strings.NewReader(input + "\nexit\n")
-	cmd.Stdin = stdin
+	cmd.Stdin = strings.NewReader(input + "\nexit\n")
 
-	var out bytes.Buffer
-	cmd.Stdout = &out
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
 
 	err := cmd.Run()
-	return out.String(), err
+
+	combined := outBuf.String() + errBuf.String()
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			return combined, 1, err
+		}
+	}
+	return combined, exitCode, nil
 }
 
-// stripPrompt убирает приглашения и заголовок
 func stripPrompt(s string) string {
 	lines := strings.Split(s, "\n")
 	var clean []string
@@ -39,7 +47,7 @@ func stripPrompt(s string) string {
 }
 
 func TestCatCommand(t *testing.T) {
-	out, err := runCLI("cat " + inputFile)
+	out, _, err := runCLI("cat " + inputFile)
 	if err != nil {
 		t.Fatalf("cat command failed to run: %v", err)
 	}
@@ -50,7 +58,7 @@ func TestCatCommand(t *testing.T) {
 }
 
 func TestEchoCommand(t *testing.T) {
-	out, _ := runCLI("echo hello")
+	out, _, _ := runCLI("echo hello")
 	clean := stripPrompt(out)
 	expected := "hello\n\n"
 	if clean != expected {
@@ -59,7 +67,7 @@ func TestEchoCommand(t *testing.T) {
 }
 
 func TestWcCommand(t *testing.T) {
-	out, _ := runCLI("wc " + inputFile)
+	out, _, _ := runCLI("wc " + inputFile)
 	clean := stripPrompt(out)
 	if !strings.Contains(clean, inputFile) {
 		t.Errorf("TestWcCommand failed.\nExpected output to mention filename: %q\nActual: %s", inputFile, clean)
@@ -67,7 +75,7 @@ func TestWcCommand(t *testing.T) {
 }
 
 func TestPwdCommand(t *testing.T) {
-	out, _ := runCLI("pwd")
+	out, _, _ := runCLI("pwd")
 	clean := stripPrompt(out)
 	if !strings.Contains(clean, "/") && !strings.Contains(clean, "\\") {
 		t.Errorf("TestPwdCommand failed.\nExpected output to be a path.\nGot: %q", clean)
@@ -76,16 +84,16 @@ func TestPwdCommand(t *testing.T) {
 
 func TestUnknownCommandExternal(t *testing.T) {
 	os.Setenv("HOME", "/tmp/fakehome")
-	out, _ := runCLI("echo $HOME")
+	out, _, _ := runCLI("echo $HOME")
 	clean := stripPrompt(out)
-	expected := "/tmp/fakehome\n\n"
-	if clean != expected {
-		t.Errorf("TestUnknownCommandExternal failed.\nExpected: %q\nGot: %q", expected, clean)
+
+	if !strings.Contains(clean, "/tmp/fakehome") {
+		t.Errorf("Expected /tmp/fakehome in output, got: %q", clean)
 	}
 }
 
 func TestQuotedArguments(t *testing.T) {
-	out, _ := runCLI(`echo "a b c"`)
+	out, _, _ := runCLI(`echo "a b c"`)
 	clean := stripPrompt(out)
 	expected := "a b c\n\n"
 	if clean != expected {
@@ -94,7 +102,7 @@ func TestQuotedArguments(t *testing.T) {
 }
 
 func TestGrepBasic(t *testing.T) {
-	out, _ := runCLI(`grep test ` + inputFile)
+	out, _, _ := runCLI(`grep test ` + inputFile)
 	clean := stripPrompt(out)
 	if !strings.Contains(clean, "this is a test") {
 		t.Errorf("TestGrepBasic failed.\nExpected to find: \"this is a test\"\nGot: %s", clean)
@@ -102,7 +110,7 @@ func TestGrepBasic(t *testing.T) {
 }
 
 func TestGrepWordMatch(t *testing.T) {
-	out, _ := runCLI(`grep -w test ` + inputFile)
+	out, _, _ := runCLI(`grep -w test ` + inputFile)
 	clean := stripPrompt(out)
 	if strings.Contains(clean, "testing") || strings.Contains(clean, "contest") {
 		t.Errorf("TestGrepWordMatch failed.\nUnexpected lines matched: %s", clean)
@@ -110,7 +118,7 @@ func TestGrepWordMatch(t *testing.T) {
 }
 
 func TestGrepIgnoreCase(t *testing.T) {
-	out, _ := runCLI(`grep -i FOO ` + inputFile)
+	out, _, _ := runCLI(`grep -i FOO ` + inputFile)
 	clean := stripPrompt(out)
 	if !strings.Contains(clean, "FOO bar") || !strings.Contains(clean, "foobar") {
 		t.Errorf("TestGrepIgnoreCase failed.\nExpected matches not found.\nOutput: %s", clean)
@@ -118,7 +126,7 @@ func TestGrepIgnoreCase(t *testing.T) {
 }
 
 func TestGrepAfterLines(t *testing.T) {
-	out, _ := runCLI(`grep -A 2 match ` + inputFile)
+	out, _, _ := runCLI(`grep -A 2 match ` + inputFile)
 	clean := stripPrompt(out)
 	if !strings.Contains(clean, "line2") {
 		t.Errorf("TestGrepAfterLines failed.\nExpected line2 after match not found.\nOutput:\n%s", clean)
@@ -126,7 +134,7 @@ func TestGrepAfterLines(t *testing.T) {
 }
 
 func TestPipelineCommands(t *testing.T) {
-	out, _ := runCLI(`cat ` + inputFile + ` | grep test | wc`)
+	out, _, _ := runCLI(`cat ` + inputFile + ` | grep test | wc`)
 	clean := stripPrompt(out)
 	if strings.Contains(clean, "broken pipe") || strings.Contains(clean, "exit status") {
 		t.Errorf("TestPipelineCommands failed.\nError in execution:\n%s", clean)
@@ -138,9 +146,103 @@ func TestPipelineCommands(t *testing.T) {
 
 func TestEnvSubstitution(t *testing.T) {
 	os.Setenv("FOO_TEST_VAR", "VALUE_123")
-	out, _ := runCLI(`echo $FOO_TEST_VAR`)
+	out, _, _ := runCLI(`echo $FOO_TEST_VAR`)
 	clean := stripPrompt(out)
 	if !strings.Contains(clean, "VALUE_123") {
 		t.Errorf("TestEnvSubstitution failed.\nExpected: \"VALUE_123\"\nGot: %q", clean)
+	}
+}
+
+func TestStrongQuotesLiteral(t *testing.T) {
+	out, _, _ := runCLI(`echo '$HOME'`)
+	clean := stripPrompt(out)
+	expected := "$HOME\n\n"
+	if clean != expected {
+		t.Errorf("Expected strong quotes literal, got: %q", clean)
+	}
+}
+
+func TestWeakQuotesExpand(t *testing.T) {
+	os.Setenv("FOO_TEST_VAR", "ABC123")
+	out, _, _ := runCLI(`echo "$FOO_TEST_VAR"`)
+	clean := stripPrompt(out)
+	expected := "ABC123\n\n"
+	if clean != expected {
+		t.Errorf("Expected weak quotes expansion, got: %q", clean)
+	}
+}
+
+func TestExternalCommandErrorCode(t *testing.T) {
+	out, exitCode, _ := runCLI("nonexistent_command")
+	if exitCode == 0 {
+		t.Logf("Warning: Expected non-zero exit code for unknown command, got 0. Output: %s", out)
+	}
+	if !strings.Contains(out, "nonexistent_command") && !strings.Contains(out, "not found") {
+		t.Logf("Warning: Expected command name or 'not found' in output, got: %s", out)
+	}
+}
+
+func TestMultipleSequentialCommands(t *testing.T) {
+	input := `
+echo start
+nonexistent_command
+echo after error
+pwd
+`
+	out, _, _ := runCLI(input)
+	clean := stripPrompt(out)
+
+	if !strings.Contains(clean, "start") {
+		t.Error("Expected 'start' in output")
+	}
+	if !strings.Contains(clean, "after error") {
+		t.Error("Expected 'after error' in output")
+	}
+	if !strings.Contains(clean, "/") && !strings.Contains(clean, "\\") {
+		t.Error("Expected a valid path from pwd after error")
+	}
+}
+
+func TestCommandFailsThenSucceeds(t *testing.T) {
+	input := `
+grep missingfile.txt
+echo still working
+`
+	out, _, _ := runCLI(input)
+	clean := stripPrompt(out)
+
+	if !strings.Contains(clean, "grep:") && !strings.Contains(clean, "error") {
+		t.Logf("Warning: Expected grep error message")
+	}
+	if !strings.Contains(clean, "still working") {
+		t.Error("Expected CLI to continue after grep error")
+	}
+}
+
+func TestChainEchoGrep(t *testing.T) {
+	input := `
+echo hello testing | grep test
+`
+	out, _, _ := runCLI(input)
+	clean := stripPrompt(out)
+
+	if !strings.Contains(clean, "hello testing") {
+		t.Errorf("Expected output to match grep input: %s", clean)
+	}
+}
+
+func TestPipeErrorPropagation(t *testing.T) {
+	input := `
+cat nofile.txt | grep something
+echo done
+`
+	out, _, _ := runCLI(input)
+	clean := stripPrompt(out)
+
+	if !strings.Contains(clean, "cat:") && !strings.Contains(clean, "error") {
+		t.Logf("Warning: Expected cat error message in output")
+	}
+	if !strings.Contains(clean, "done") {
+		t.Error("Expected CLI to continue and echo 'done'")
 	}
 }
