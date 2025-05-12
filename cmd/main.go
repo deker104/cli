@@ -12,7 +12,6 @@ import (
 )
 
 func main() {
-	// Инициализация окружения
 	envManager := env.NewEnvManager()
 	exec := executor.NewExecutor(envManager)
 
@@ -26,20 +25,18 @@ func main() {
 		}
 		line := scanner.Text()
 
-		// Парсинг команды
 		tokens := parser.Parse(line)
 		if len(tokens) == 0 {
 			continue
 		}
 
-		// Подстановка
-		for i := range tokens {
-			tokens[i] = substitutor.Substitute(tokens[i], 0)
+		// Выполним подстановку в каждом токене, если нужно
+		var substituted [][]string
+		for _, cmd := range tokens {
+			substituted = append(substituted, substitutor.Substitute(cmd, 0))
 		}
 
-		// Выполнение команды
-		exitCode := exec.Execute(tokens)
-
+		exitCode := exec.Execute(substituted)
 		if exitCode == executor.ExitCode {
 			break
 		}

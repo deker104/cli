@@ -1,23 +1,28 @@
 package parser
 
-import (
-	"strings"
-)
+import "strings"
 
-// Parse разбирает строку, учитывая кавычки, пайпы и пробелы между аргументами.
-func Parse(input string) [][]string {
-	var result [][]string
-	var tokens []string
+// Token — аргумент команды, с указанием, разрешена ли подстановка переменных
+type Token struct {
+	Value         string
+	SubstituteEnv bool
+}
+
+// Parse разбирает строку в пайпы и токены с учетом кавычек и подстановок
+func Parse(input string) [][]Token {
+	var result [][]Token
+	var tokens []Token
 	var current strings.Builder
 	inQuotes := false
 	quoteChar := byte(0)
+	substitute := true
 
 	for i := 0; i < len(input); i++ {
 		char := input[i]
 
 		if char == '|' && !inQuotes {
 			if current.Len() > 0 {
-				tokens = append(tokens, current.String())
+				tokens = append(tokens, Token{current.String(), substitute})
 				current.Reset()
 			}
 			if len(tokens) > 0 {
@@ -27,7 +32,7 @@ func Parse(input string) [][]string {
 			continue
 		}
 
-		if char == '"' || char == '\'' {
+		if (char == '"' || char == '\'') && (!inQuotes || quoteChar == char) {
 			if inQuotes {
 				if char == quoteChar {
 					inQuotes = false
@@ -36,11 +41,11 @@ func Parse(input string) [][]string {
 			} else {
 				inQuotes = true
 				quoteChar = char
+				substitute = (char == '"') // только слабые кавычки позволяют подстановку
 				continue
 			}
 		}
 
-		// Поддержка экранированных кавычек
 		if char == '\\' && i+1 < len(input) && (input[i+1] == '"' || input[i+1] == '\'') {
 			i++
 			char = input[i]
@@ -48,8 +53,9 @@ func Parse(input string) [][]string {
 
 		if char == ' ' && !inQuotes {
 			if current.Len() > 0 {
-				tokens = append(tokens, current.String())
+				tokens = append(tokens, Token{current.String(), substitute})
 				current.Reset()
+				substitute = true
 			}
 			continue
 		}
@@ -58,10 +64,8 @@ func Parse(input string) [][]string {
 	}
 
 	if current.Len() > 0 {
-		tokens = append(tokens, current.String())
+		tokens = append(tokens, Token{current.String(), substitute})
 	}
-
-	// НЕ разбиваем аргументы, если они были в кавычках
 	if len(tokens) > 0 {
 		result = append(result, tokens)
 	}

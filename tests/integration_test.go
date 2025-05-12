@@ -144,3 +144,23 @@ func TestEnvSubstitution(t *testing.T) {
 		t.Errorf("TestEnvSubstitution failed.\nExpected: \"VALUE_123\"\nGot: %q", clean)
 	}
 }
+
+func TestStrongQuotesLiteral(t *testing.T) {
+	out, _ := runCLI(`echo '$HOME'`)
+	clean := stripPrompt(out)
+	expected := "$HOME\n\n"
+	if clean != expected {
+		t.Errorf("Expected strong quotes literal, got: %q", clean)
+	}
+}
+
+func TestWeakQuotesExpand(t *testing.T) {
+	os.Setenv("FOO_TEST_VAR", "ABC123")
+	out, _ := runCLI(`echo "$FOO_TEST_VAR"`)
+	clean := stripPrompt(out)
+	expected := "ABC123\n\n"
+	if clean != expected {
+		t.Errorf("Expected weak quotes expansion, got: %q", clean)
+	}
+}
+
