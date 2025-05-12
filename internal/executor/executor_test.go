@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/deker104/cli/internal/env"
@@ -60,62 +61,71 @@ func TestExit(t *testing.T) {
 	}
 }
 
+func captureStderr(f func()) string {
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+
+	f()
+
+	w.Close()
+	os.Stderr = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	r.Close()
+
+	return buf.String()
+}
+
 func TestUnknownCommand(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
-	output := captureOutput(func() {
+	output := captureStderr(func() {
 		exec.Execute([][]string{{"unknown_command"}})
 	})
 
-	if output == "" {
-		t.Errorf("Expected error output for unknown command")
+	if !strings.Contains(output, "unknown_command") {
+		t.Errorf("Expected error output for unknown command, got: %q", output)
 	}
 }
 
-func TestGrep(t *testing.T) {
+func TestPipeEchoToWc(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
-	testFile := "testfile.txt"
-	content := "hello world\nthis is a test\ngrep is cool\ntest again\nanother test line\ntasty line\n"
-	os.WriteFile(testFile, []byte(content), 0644)
-	defer os.Remove(testFile)
+	output := captureOutput(func() {
+		exec.Execute([][]string{
+			{"echo", "one two three"},
+			{"wc"},
+		})
+	})
+
+	if !(strings.Contains(output, "1") && strings.Contains(output, "3")) {
+		t.Errorf("Expected line and word count, got: %q", output)
+	}
+}
+
+func TestPipeEchoToGrep(t *testing.T) {
+	exec := NewExecutor(env.NewEnvManager())
 
 	output := captureOutput(func() {
-		exec.Execute([][]string{{"grep", "test", testFile}})
+		exec.Execute([][]string{
+			{"echo", "this is a test line"},
+			{"grep", "test"},
+		})
 	})
-	expected := "this is a test\ntest again\nanother test line\n"
-	if output != expected {
-		t.Errorf("Expected %q, got %q", expected, output)
-	}
 
-	output = captureOutput(func() {
-		exec.Execute([][]string{{"grep", "-w", "test", testFile}})
-	})
-	expected = "this is a test\ntest again\nanother test line\n"
-	if output != expected {
-		t.Errorf("Expected %q, got %q", expected, output)
+	if !strings.Contains(output, "test line") {
+		t.Errorf("Expected grep to find 'test', got: %q", output)
 	}
+}
 
-	output = captureOutput(func() {
-		exec.Execute([][]string{{"grep", "-i", "TEST", testFile}})
-	})
-	expected = "this is a test\ntest again\nanother test line\n"
-	if output != expected {
-		t.Errorf("Expected %q, got %q", expected, output)
-	}
+func TestExternalCommandFailureCode(t *testing.T) {
+	exec := NewExecutor(env.NewEnvManager())
 
-	output = captureOutput(func() {
-		exec.Execute([][]string{{"grep", "-A", "1", "grep", testFile}})
-	})
-	expected = "grep is cool\ntest again\n"
-	if output != expected {
-		t.Errorf("Expected %q, got %q", expected, output)
-	}
-
-	output = captureOutput(func() {
-		exec.Execute([][]string{{"grep", "hello", "nofile.txt"}})
-	})
-	if output == "" {
-		t.Errorf("Expected error message for missing file")
+	// Преднамеренно ошибка
+	code := exec.Execute([][]string{{"nonexistent_command"}})
+	if code == 0 {
+		t.Errorf("Expected non-zero exit code for invalid command, got %d", code)
 	}
 }

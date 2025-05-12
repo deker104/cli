@@ -1,0 +1,19 @@
+hello world
+this is a test
+grep is cool
+test again
+another test line
+FOO bar
+Test
+TEST
+test
+match
+line1
+line2
+one
+two
+three
+foo
+bar
+baz
+foobar
