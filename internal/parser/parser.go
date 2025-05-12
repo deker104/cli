@@ -1,20 +1,44 @@
 package parser
 
-import (
-	"strings"
-)
+import "strings"
 
-// Parse разбирает строку, учитывая кавычки и экранированные символы.
-func Parse(input string) []string {
-	var tokens []string
+// Token представляет собой аргумент команды.
+// SubstituteEnv указывает, разрешена ли подстановка переменных (true — двойные кавычки или без кавычек).
+type Token struct {
+	Value         string
+	SubstituteEnv bool
+}
+
+// Parse разбивает строку ввода на пайпы и токены.
+// Поддерживает:
+// - Кавычки (' и "), различающиеся по подстановке
+// - Экранирование кавычек
+// - Пробелы между аргументами
+// - Разделение пайпов (|) на отдельные команды
+func Parse(input string) [][]Token {
+	var result [][]Token
+	var tokens []Token
 	var current strings.Builder
 	inQuotes := false
 	quoteChar := byte(0)
+	substitute := true
 
 	for i := 0; i < len(input); i++ {
 		char := input[i]
 
-		if char == '"' || char == '\'' {
+		if char == '|' && !inQuotes {
+			if current.Len() > 0 {
+				tokens = append(tokens, Token{current.String(), substitute})
+				current.Reset()
+			}
+			if len(tokens) > 0 {
+				result = append(result, tokens)
+				tokens = nil
+			}
+			continue
+		}
+
+		if (char == '"' || char == '\'') && (!inQuotes || quoteChar == char) {
 			if inQuotes {
 				if char == quoteChar {
 					inQuotes = false
@@ -23,33 +47,34 @@ func Parse(input string) []string {
 			} else {
 				inQuotes = true
 				quoteChar = char
+				substitute = (char == '"')
 				continue
 			}
 		}
 
-		if char == ' ' && !inQuotes {
-			if current.Len() > 0 {
-				tokens = append(tokens, current.String())
-				current.Reset()
-			}
-			continue
-		}
-
-		// Экранирование кавычек
 		if char == '\\' && i+1 < len(input) && (input[i+1] == '"' || input[i+1] == '\'') {
 			i++
 			char = input[i]
 		}
 
+		if char == ' ' && !inQuotes {
+			if current.Len() > 0 {
+				tokens = append(tokens, Token{current.String(), substitute})
+				current.Reset()
+				substitute = true
+			}
+			continue
+		}
+
 		current.WriteByte(char)
 	}
 
-	// Если кавычки остались незакрытыми, включаем их в последний токен
-	if inQuotes {
-		tokens = append(tokens, string(quoteChar)+current.String())
-	} else if current.Len() > 0 {
-		tokens = append(tokens, current.String())
+	if current.Len() > 0 {
+		tokens = append(tokens, Token{current.String(), substitute})
+	}
+	if len(tokens) > 0 {
+		result = append(result, tokens)
 	}
 
-	return tokens
+	return result
 }
