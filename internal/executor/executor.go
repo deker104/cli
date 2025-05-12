@@ -88,12 +88,12 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 		}
 	}
 
-	// Закрытие всех пайпов
+	// Закрытие пайпов в родителе
 	for _, pipe := range pipes {
 		pipe.Close()
 	}
 
-	// Ожидание всех команд
+	// Ожидание завершения
 	finalCode := 0
 	for i, cmd := range commands {
 		err := cmd.Wait()
@@ -101,13 +101,12 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 			if exitErr, ok := err.(*exec.ExitError); ok {
 				code := exitErr.ExitCode()
 				fmt.Fprintf(os.Stderr, "command %d exited with code %d: %v\n", i, code, err)
-				finalCode = code // сохраняем код последней упавшей команды
+				finalCode = code
 			} else {
 				fmt.Fprintf(os.Stderr, "command %d failed: %v\n", i, err)
 				finalCode = 1
 			}
 		} else {
-			// если предыдущих ошибок не было — обновляем код последней успешной команды
 			if finalCode == 0 {
 				finalCode = cmd.ProcessState.ExitCode()
 			}
@@ -117,30 +116,28 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 	return finalCode
 }
 
-// runCat — встроенная команда `cat`
 func (e *Executor) runCat(args []string) int {
 	if len(args) == 0 {
-		fmt.Println("cat: missing file operand")
+		fmt.Fprintln(os.Stderr, "cat: missing file operand")
 		return 1
 	}
 	data, err := os.ReadFile(args[0])
 	if err != nil {
-		fmt.Printf("cat: %v\n", err)
+		fmt.Fprintf(os.Stderr, "cat: %v\n", err)
 		return 1
 	}
 	fmt.Print(string(data))
 	return 0
 }
 
-// runWc — встроенная команда `wc`
 func (e *Executor) runWc(args []string) int {
 	if len(args) == 0 {
-		fmt.Println("wc: missing file operand")
+		fmt.Fprintln(os.Stderr, "wc: missing file operand")
 		return 1
 	}
 	data, err := os.ReadFile(args[0])
 	if err != nil {
-		fmt.Printf("wc: %v\n", err)
+		fmt.Fprintf(os.Stderr, "wc: %v\n", err)
 		return 1
 	}
 	lines := strings.Count(string(data), "\n")
@@ -150,7 +147,6 @@ func (e *Executor) runWc(args []string) int {
 	return 0
 }
 
-// runExternalCommand — выполняет внешнюю программу
 func (e *Executor) runExternalCommand(tokens []string) int {
 	cmd := exec.Command(tokens[0], tokens[1:]...)
 	cmd.Env = os.Environ()
@@ -159,13 +155,15 @@ func (e *Executor) runExternalCommand(tokens []string) int {
 
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode()
+		}
 		return 1
 	}
 	return 0
 }
 
-// GrepOptions хранит параметры grep
 type GrepOptions struct {
 	Pattern    string
 	Filename   string
@@ -174,7 +172,6 @@ type GrepOptions struct {
 	AfterLines int
 }
 
-// runGrep парсит флаги и вызывает executeGrep
 func (e *Executor) runGrep(args []string) int {
 	flags := pflag.NewFlagSet("grep", pflag.ContinueOnError)
 
@@ -184,13 +181,13 @@ func (e *Executor) runGrep(args []string) int {
 
 	err := flags.Parse(args)
 	if err != nil {
-		fmt.Println("grep: error parsing flags")
+		fmt.Fprintln(os.Stderr, "grep: error parsing flags")
 		return 1
 	}
 
 	remainingArgs := flags.Args()
 	if len(remainingArgs) < 2 {
-		fmt.Println("grep: usage: grep [options] pattern file")
+		fmt.Fprintln(os.Stderr, "grep: usage: grep [options] pattern file")
 		return 1
 	}
 
@@ -205,16 +202,14 @@ func (e *Executor) runGrep(args []string) int {
 	return e.executeGrep(options)
 }
 
-// executeGrep выполняет поиск
 func (e *Executor) executeGrep(opts GrepOptions) int {
 	file, err := os.Open(opts.Filename)
 	if err != nil {
-		fmt.Printf("grep: %v\n", err)
+		fmt.Fprintf(os.Stderr, "grep: %v\n", err)
 		return 1
 	}
 	defer file.Close()
 
-	// Формируем шаблон регулярного выражения
 	pattern := opts.Pattern
 	if opts.WordMatch {
 		pattern = `\b` + pattern + `\b`
@@ -225,7 +220,7 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		fmt.Printf("grep: invalid regex pattern: %v\n", err)
+		fmt.Fprintf(os.Stderr, "grep: invalid regex pattern: %v\n", err)
 		return 1
 	}
 
@@ -234,12 +229,11 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 	linesAfter := 0
 	currentLine := 0
 
-	// Читаем строки и фильтруем вывод
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if re.MatchString(line) {
-			linesAfter = max(linesAfter, opts.AfterLines) // пересечение областей
+			linesAfter = max(linesAfter, opts.AfterLines)
 			buffer.WriteString(line + "\n")
 		} else if linesAfter > 0 {
 			buffer.WriteString(line + "\n")
@@ -250,10 +244,17 @@ func (e *Executor) executeGrep(opts GrepOptions) int {
 	}
 
 	if err := scanner.Err(); err != nil {
-		fmt.Printf("grep: error reading file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "grep: error reading file: %v\n", err)
 		return 1
 	}
 
 	fmt.Print(buffer.String())
 	return 0
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

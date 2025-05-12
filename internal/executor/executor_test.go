@@ -61,17 +61,35 @@ func TestExit(t *testing.T) {
 	}
 }
 
+func captureStderr(f func()) string {
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+
+	f()
+
+	w.Close()
+	os.Stderr = old
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	r.Close()
+
+	return buf.String()
+}
+
 func TestUnknownCommand(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
-	output := captureOutput(func() {
+	output := captureStderr(func() {
 		exec.Execute([][]string{{"unknown_command"}})
 	})
 
-	if output == "" {
-		t.Errorf("Expected error output for unknown command")
+	if !strings.Contains(output, "unknown_command") {
+		t.Errorf("Expected error output for unknown command, got: %q", output)
 	}
 }
+
 
 func TestPipeEchoToWc(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())

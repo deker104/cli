@@ -18,7 +18,7 @@ func main() {
 	fmt.Println("Simple CLI. Type 'exit' to quit.")
 	scanner := bufio.NewScanner(os.Stdin)
 
-	exitCode := 0 // <— вот тут инициализируем
+	var lastExitCode int
 
 	for {
 		fmt.Print("> ")
@@ -34,14 +34,16 @@ func main() {
 
 		var substituted [][]string
 		for _, cmd := range tokens {
-			substituted = append(substituted, substitutor.Substitute(cmd, 0))
+			substituted = append(substituted, substitutor.Substitute(cmd, lastExitCode))
 		}
 
-		exitCode = exec.Execute(substituted)
-		if exitCode == executor.ExitCode {
+		lastExitCode = exec.Execute(substituted)
+		if lastExitCode == executor.ExitCode {
 			break
 		}
 	}
 
-	os.Exit(exitCode)
+	if lastExitCode != 0 && lastExitCode != executor.ExitCode {
+		os.Exit(lastExitCode)
+	}
 }
