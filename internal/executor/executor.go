@@ -59,14 +59,16 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 
 	// Создание команд
 	for _, cmdArgs := range pipeline {
-		commands = append(commands, exec.Command(cmdArgs[0], cmdArgs[1:]...))
+		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+		cmd.Env = os.Environ()
+		commands = append(commands, cmd)
 	}
 
-	// Установка пайпов между командами
+	// Создание пайпов между командами
 	for i := 0; i < len(commands)-1; i++ {
 		readEnd, writeEnd, err := os.Pipe()
 		if err != nil {
-			fmt.Printf("pipe error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "pipe error: %v\n", err)
 			return 1
 		}
 		commands[i].Stdout = writeEnd
@@ -76,34 +78,43 @@ func (e *Executor) runPipeline(pipeline [][]string) int {
 
 	// Последняя команда выводит в stdout
 	commands[len(commands)-1].Stdout = os.Stdout
+	commands[len(commands)-1].Stderr = os.Stderr
 
 	// Запуск всех команд
 	for _, cmd := range commands {
-		cmd.Env = os.Environ()
 		if err := cmd.Start(); err != nil {
-			fmt.Printf("command start error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "command start error: %v\n", err)
 			return 1
 		}
 	}
 
-	// Закрытие всех пайпов в родителе
+	// Закрытие всех пайпов
 	for _, pipe := range pipes {
 		pipe.Close()
 	}
 
-	// Ожидание завершения всех команд
-	var lastExitCode int
-	for _, cmd := range commands {
+	// Ожидание всех команд
+	finalCode := 0
+	for i, cmd := range commands {
 		err := cmd.Wait()
 		if err != nil {
-			fmt.Println(err)
-			lastExitCode = 1
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				code := exitErr.ExitCode()
+				fmt.Fprintf(os.Stderr, "command %d exited with code %d: %v\n", i, code, err)
+				finalCode = code // сохраняем код последней упавшей команды
+			} else {
+				fmt.Fprintf(os.Stderr, "command %d failed: %v\n", i, err)
+				finalCode = 1
+			}
 		} else {
-			lastExitCode = cmd.ProcessState.ExitCode()
+			// если предыдущих ошибок не было — обновляем код последней успешной команды
+			if finalCode == 0 {
+				finalCode = cmd.ProcessState.ExitCode()
+			}
 		}
 	}
 
-	return lastExitCode
+	return finalCode
 }
 
 // runCat — встроенная команда `cat`

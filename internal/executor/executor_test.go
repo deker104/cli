@@ -102,3 +102,13 @@ func TestPipeEchoToGrep(t *testing.T) {
 		t.Errorf("Expected grep to find 'test', got: %q", output)
 	}
 }
+
+func TestExternalCommandFailureCode(t *testing.T) {
+	exec := NewExecutor(env.NewEnvManager())
+
+	// Преднамеренно ошибка
+	code := exec.Execute([][]string{{"nonexistent_command"}})
+	if code == 0 {
+		t.Errorf("Expected non-zero exit code for invalid command, got %d", code)
+	}
+}
