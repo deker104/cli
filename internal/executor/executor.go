@@ -47,6 +47,8 @@ func (e *Executor) runSingleCommand(tokens []string) int {
 		return e.runWc(tokens[1:])
 	case "grep":
 		return e.runGrep(tokens[1:])
+	case "cd":
+		return e.runCd(tokens[1:])
 	default:
 		return e.runExternalCommand(tokens)
 	}
@@ -136,6 +138,46 @@ func (e *Executor) runWc(args []string) int {
 	words := len(strings.Fields(string(data)))
 	bytes := len(data)
 	fmt.Printf("%d %d %d %s\n", lines, words, bytes, args[0])
+	return 0
+}
+
+// runCd — встроенная команда `cd`
+func (e *Executor) runCd(args []string) int {
+	var dir string
+	if len(args) == 0 {
+		dir = os.Getenv("HOME")
+		if dir == "" {
+			fmt.Println("cd: HOME not set")
+			return 1
+		}
+	} else if len(args) == 1 {
+		if args[0] == "-" {
+			// Если аргумент "-", переходим в предыдущую директорию
+			dir = os.Getenv("OLDPWD")
+			if dir == "" {
+				fmt.Println("cd: OLDPWD not set")
+				return 1
+			}
+		} else {
+			dir = args[0]
+		}
+	} else {
+		fmt.Println("cd: too many arguments")
+		return 1
+	}
+
+	// Сохраняем текущее значение директории в переменную окружения OLDPWD
+	currentDir, _ := os.Getwd()
+	os.Setenv("OLDPWD", currentDir)
+
+	if err := os.Chdir(dir); err != nil {
+		fmt.Printf("cd: %v\n", err)
+		return 1
+	}
+
+	newDir, _ := os.Getwd()
+	fmt.Println("Changed directory to:", newDir)
+
 	return 0
 }
 
