@@ -74,6 +74,44 @@ func TestPwdCommand(t *testing.T) {
 	}
 }
 
+func TestLsCommand(t *testing.T) {
+	files := []string{"integration_test.go", "test_input.txt"}
+	out, _ := runCLI("ls")
+	clean := stripPrompt(out)
+	expected := strings.Join(files, "\n")
+	if clean[:len(clean)-2] != expected {
+		t.Errorf("TestLsCommand failed.\nGot: %q", clean[:len(clean)-2])
+	}
+}
+
+func TestCdCommand(t *testing.T) {
+	// Тестируем cd
+	out, err := runCLI("cd")
+	if err != nil {
+		t.Fatalf("Command failed: %v", err)
+	}
+
+	clean := stripPrompt(out)
+	expected, _ := os.UserHomeDir()
+	if !strings.Contains(clean, expected) {
+		t.Errorf("cd command failed.\nExpected to contain: %q\nGot: %q", expected, clean)
+	}
+
+	// Тестируем cd ../ и cd dir
+	os.Mkdir("dir", 0777)
+	out, err = runCLI("cd dir\ncd ../")
+	if err != nil {
+		t.Fatalf("Command failed: %v", err)
+	}
+
+	clean = stripPrompt(out)
+	expected, _ = os.Getwd()
+	if !strings.Contains(clean, expected) {
+		t.Errorf("cd - command failed.\nExpected to contain: %q\nGot: %q", expected, clean)
+	}
+	os.Remove("dir")
+}
+
 func TestUnknownCommandExternal(t *testing.T) {
 	os.Setenv("HOME", "/tmp/fakehome")
 	out, _ := runCLI("echo $HOME")

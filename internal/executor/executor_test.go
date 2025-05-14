@@ -52,6 +52,55 @@ func TestPwd(t *testing.T) {
 	}
 }
 
+func TestLs(t *testing.T) {
+	exec := NewExecutor(env.NewEnvManager())
+
+	files := []string{"executor.go", "executor_test.go"}
+	output := captureOutput(func() {
+		exec.Execute([][]string{{"ls"}})
+	})
+
+	output = strings.TrimSpace(output)
+	expected := strings.Join(files, "\n")
+	if output != expected {
+		t.Errorf("Ожидалось:\n%s\nПолучено:\n%s", expected, output)
+	}
+}
+
+func TestCd(t *testing.T) {
+	exec := NewExecutor(env.NewEnvManager())
+
+	// Тестируем cd
+	output := captureOutput(func() {
+		exec.Execute([][]string{{"cd"}})
+	})
+
+	expected, _ := os.Getwd()
+	if !strings.Contains(output, expected) {
+		t.Errorf("Ожидалось: %s\nПолучено: %s", expected, output)
+	}
+
+	// Тестируем cd -
+	output = captureOutput(func() {
+		exec.Execute([][]string{{"cd", "-"}})
+	})
+
+	expected, _ = os.Getwd()
+	if !strings.Contains(output, expected) {
+		t.Errorf("Ожидалось:\n%s\nПолучено:\n%s", expected, output)
+	}
+
+	// Тестируем cd  ../
+	output = captureOutput(func() {
+		exec.Execute([][]string{{"cd", "../"}})
+	})
+
+	expected, _ = os.Getwd()
+	if !strings.Contains(output, expected) {
+		t.Errorf("Ожидалось: %s\nПолучено: %s", expected, output)
+	}
+}
+
 func TestExit(t *testing.T) {
 	exec := NewExecutor(env.NewEnvManager())
 
