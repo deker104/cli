@@ -170,7 +170,10 @@ func (e *Executor) runCd(args []string) int {
 	if len(args) == 0 {
 		dir = os.Getenv("HOME")
 		if dir == "" {
-			fmt.Println("cd: HOME not set")
+			dir = os.Getenv("USERPROFILE")
+		}
+		if dir == "" {
+			fmt.Println("cd: HOME/USERPROFILE not set")
 			return 1
 		}
 	} else if len(args) == 1 {
@@ -178,8 +181,12 @@ func (e *Executor) runCd(args []string) int {
 			// Если аргумент "-", переходим в предыдущую директорию
 			dir = os.Getenv("OLDPWD")
 			if dir == "" {
-				fmt.Println("cd: OLDPWD not set")
-				return 1
+				cwd, err := os.Getwd()
+				if err != nil {
+					fmt.Println("cd: cannot determine current directory")
+					return 1
+				}
+				dir = cwd
 			}
 		} else {
 			dir = args[0]
