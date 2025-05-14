@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/deker104/cli/internal/env"
@@ -49,6 +50,8 @@ func (e *Executor) runSingleCommand(tokens []string) int {
 		return e.runGrep(tokens[1:])
 	case "cd":
 		return e.runCd(tokens[1:])
+	case "ls":
+		return e.runLs(tokens[1:])
 	default:
 		return e.runExternalCommand(tokens)
 	}
@@ -138,6 +141,26 @@ func (e *Executor) runWc(args []string) int {
 	words := len(strings.Fields(string(data)))
 	bytes := len(data)
 	fmt.Printf("%d %d %d %s\n", lines, words, bytes, args[0])
+	return 0
+}
+
+// runLs — встроенная команда `ls`
+func (e *Executor) runLs(args []string) int {
+	dir := "."
+	if len(args) == 1 {
+		dir = args[0]
+	}
+	data, err := os.ReadDir(dir)
+	if err != nil {
+		fmt.Printf("ls: %v\n", err)
+		return 1
+	}
+	sort.Slice(data, func(i, j int) bool {
+		return data[i].Name() < data[j].Name()
+	})
+	for _, elem := range data {
+		fmt.Println(elem.Name())
+	}
 	return 0
 }
 
